@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GxP Portal - Cổng thông tin tập trung</title>
+  <meta name="description" content="GxP Portal - Hệ thống quản lý chất lượng, cổng thông tin tập trung nội bộ">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- Liquid Ambient Background -->
+  <div id="custom-bg-layer"></div>
+  <div class="ambient-bg" id="ambient-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+  </div>
+
+  <!-- ═══════════════════════ GROUP SELECTOR ════════════════════════════ -->
+  <div id="group-selector-screen" style="display:none">
+    <div class="group-selector-box">
+      <div class="logo">GxP PORTAL</div>
+      <div class="subtitle">Cổng thông tin tập trung · Hệ thống quản lý chất lượng</div>
+      <h2>Chọn bộ phận của bạn</h2>
+      <div class="group-btns" id="group-btns-container"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ MAIN APP ═════════════════════════════════ -->
+  <div id="app-main" style="display:none">
+
+    <!-- HEADER -->
+    <header id="app-header">
+      <div class="header-top">
+        <div style="flex:0 0 160px"></div>
+        <div class="header-title">
+          <h1>GxP PORTAL</h1>
+          <p>Cổng thông tin tập trung &nbsp;·&nbsp; Hệ thống quản lý chất lượng</p>
+        </div>
+        <div class="header-controls" style="flex:0 0 160px;justify-content:flex-end">
+          <button class="user-badge" id="user-badge" onclick="App.changeGroup()" data-tooltip="Đổi bộ phận">
+            <span class="user-icon">👤</span>
+            <span class="user-badge-text"></span>
+          </button>
+          <button id="btn-gear" onclick="App.onGearClick()" data-tooltip="Quản trị viên" aria-label="Admin">⚙️</button>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <div class="search-box">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input id="search-input" type="text" placeholder="Tìm kiếm công cụ (VD: BBSC, Kho, QA...)" autocomplete="off"
+            aria-label="Tìm kiếm">
+        </div>
+      </div>
+    </header>
+
+    <!-- ADMIN TOOLBAR -->
+    <div id="admin-toolbar" class="hidden">
+      <button class="toolbar-btn" onclick="AdminPanel.openGroupManager()">👥 QL Nhóm</button>
+      <button class="toolbar-btn" onclick="AdminPanel.openPassGroup()">🔑 Pass Admin</button>
+      <button class="toolbar-btn" onclick="AdminPanel.openSettings()">🎨 Giao diện</button>
+      <button class="toolbar-btn primary" onclick="AdminPanel.openAdd()">➕ Thêm công cụ mới</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn has-badge" id="btn-req-manager" onclick="AdminPanel.openRequestManager()"
+        data-tooltip="Duyệt yêu cầu đổi link">
+        📩 Yêu cầu <span id="req-count-badge" class="toolbar-badge" style="display:none"></span>
+      </button>
+      <button class="toolbar-btn danger" onclick="App.adminLogout()">🚪 Đăng xuất</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content">
+      <div id="items-grid">
+        <div class="loader"><span></span><span></span><span></span></div>
+      </div>
+    </main>
+
+    <footer id="app-footer">© 2026 GxP System. Internal Use Only.</footer>
+  </div>
+
+
+  <!-- ═══════════════════════ MODALS ════════════════════════════════════ -->
+
+  <!-- Folder Modal -->
+  <div class="modal-overlay hidden" id="modal-folder">
+    <div class="modal-box" style="max-width:720px">
+      <div class="modal-header">
+        <h3 class="modal-folder-title"><span class="folder-icon-label">📁</span> Folder</h3>
+        <button class="btn-close" onclick="App.closeFolder()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="folder-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Modal -->
+  <div class="modal-overlay hidden" id="modal-note">
+    <div class="modal-box" style="max-width:680px">
+      <div class="modal-header">
+        <h3 class="modal-note-title">📄 Ghi chú</h3>
+        <button class="btn-close" onclick="App.closeNote()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="note-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div class="modal-overlay hidden" id="modal-login">
+    <div class="modal-box" style="max-width:400px">
+      <div class="modal-header">
+        <h3>🔐 Xác thực Quản trị viên</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-login').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="login-desc">Vui lòng nhập mật khẩu để truy cập quản trị.</p>
+        <div class="form-group">
+          <label for="admin-password-input">Mật khẩu</label>
+          <input class="form-control" type="password" id="admin-password-input" placeholder="Nhập mật khẩu...">
+          <div class="error-msg">❌ Mật khẩu không đúng, vui lòng thử lại</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel"
+          onclick="document.getElementById('modal-login').classList.add('hidden')">Hủy</button>
+        <button class="btn btn-save" onclick="App.submitAdminLogin()">Đăng nhập</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group Password Login Modal -->
+  <div class="modal-overlay hidden" id="modal-group-login">
+    <div class="modal-box" style="max-width:380px">
+      <div class="modal-header">
+        <h3>🔑 Nhập Mật khẩu Nhóm</h3>
+        <button class="btn-close"
+          onclick="document.getElementById('modal-group-login').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body" style="padding:24px">
+        <p class="login-desc" id="group-login-desc"></p>
+        <div class="form-group">
+          <label for="group-password-input">Mật khẩu</label>
+          <input class="form-control" type="password" id="group-password-input" placeholder="Nhập mật khẩu...">
+          <div class="error-msg" id="group-login-error">❌ Mật khẩu không đúng, vui lòng thử lại</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel"
+          onclick="document.getElementById('modal-group-login').classList.add('hidden')">Hủy</button>
+        <button class="btn btn-save" onclick="App.submitGroupLogin()">Đăng nhập</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADD / EDIT ITEM MODAL (tabbed) ──────────────────────────────── -->
+  <div class="modal-overlay hidden" id="modal-edit">
+    <div class="modal-box" style="max-width:600px">
+      <div class="modal-header">
+        <h3 class="modal-edit-title">Thêm công cụ mới</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-edit').classList.add('hidden')">✕</button>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="edit-tab-bar">
+        <button class="edit-tab-btn tab-active" id="tab-info-btn" onclick="AdminPanel.switchEditTab('info')">📋 Thông
+          tin</button>
+        <button class="edit-tab-btn" id="tab-history-btn" onclick="AdminPanel.switchEditTab('history')"
+          style="display:none">🕐 Lịch sử</button>
+      </div>
+
+      <!-- Tab: Info -->
+      <div id="edit-tab-info">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="edit-type">Loại (Type)</label>
+              <select class="form-control" id="edit-type" onchange="AdminPanel.handleTypeChange()">
+                <option value="link">🔗 Tool (Liên kết)</option>
+                <option value="folder">📁 Folder</option>
+                <option value="note">📄 Ghi chú</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="edit-parent">Nằm trong Folder</label>
+              <select class="form-control" id="edit-parent">
+                <option value="">-- Trang chủ (Root) --</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit-title">Tên công cụ *</label>
+            <input class="form-control" type="text" id="edit-title" placeholder="VD: QC Tool, INFOR WMS...">
+          </div>
+          <div class="form-group" id="url-row">
+            <label for="edit-url">Đường dẫn (URL) *</label>
+            <input class="form-control" type="url" id="edit-url" placeholder="https://...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nhóm (Group) - Chọn nhiều</label>
+              <div class="checkbox-group" id="edit-groups-checkboxes"></div>
+            </div>
+            <div class="form-group">
+              <label for="edit-status">Trạng thái (Status) *</label>
+              <select class="form-control" id="edit-status">
+                <option value="live">✅ Go Live (Hoạt động)</option>
+                <option value="testing">🧪 Testing</option>
+                <option value="inactive">⛔ Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" id="thumb-row">
+              <label for="edit-thumb">Link hình ảnh (Thumbnail)</label>
+              <input class="form-control" type="text" id="edit-thumb" placeholder="URL ảnh hoặc Drive File ID">
+              <small style="color:#9e9e9e;font-size:0.72rem">* Drive file phải chia sẻ "Anyone with the link"</small>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit-desc">Mô tả ngắn</label>
+            <textarea class="form-control" id="edit-desc" rows="2" placeholder="Mô tả ngắn gọn..."></textarea>
+          </div>
+          <div class="form-group" id="content-row" style="display:none">
+            <label for="edit-content">Nội dung Ghi chú (HTML)</label>
+            <textarea class="form-control" id="edit-content" rows="5" placeholder="Nhập nội dung HTML..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-cancel"
+            onclick="document.getElementById('modal-edit').classList.add('hidden')">Hủy</button>
+          <button class="btn btn-save" onclick="AdminPanel.submitEdit()">💾 Lưu lại</button>
+        </div>
+      </div>
+
+      <!-- Tab: History -->
+      <div id="edit-tab-history" style="display:none">
+        <div class="modal-body">
+          <!-- URL Versions (links only) -->
+          <div class="history-section">
+            <div class="history-section-title">🔗 Phiên bản URL</div>
+            <div id="edit-url-versions" class="url-version-list"></div>
+          </div>
+
+          <!-- Pending requests for this item -->
+          <div class="history-section">
+            <div class="history-section-title">📩 Yêu cầu đổi link từ user</div>
+            <div id="edit-item-requests" class="req-mini-list"></div>
+          </div>
+
+          <!-- Change log -->
+          <div class="history-section">
+            <div class="history-section-title">📋 Nhật ký thay đổi</div>
+            <div id="edit-change-log" class="changelog-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REQUEST MODAL (user submits new URL) ────────────────────────── -->
+  <div class="modal-overlay hidden" id="modal-request">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-header">
+        <h3>📩 Đề xuất đổi Link</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-request').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="req-item-info">
+          <div><strong>Công cụ:</strong> <span class="req-item-name"></span></div>
+          <div style="margin-top:4px"><strong>URL hiện tại:</strong> <span class="req-current-url"
+              style="color:#9e9e9e;font-size:0.82rem;word-break:break-all"></span></div>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <label for="req-new-url">URL mới *</label>
+          <input class="form-control" type="url" id="req-new-url" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label for="req-note">Lý do đề xuất</label>
+          <textarea class="form-control" id="req-note" rows="2"
+            placeholder="VD: Link cũ hết hạn, đã chuyển server..."></textarea>
+        </div>
+        <div class="error-msg req-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel"
+          onclick="document.getElementById('modal-request').classList.add('hidden')">Hủy</button>
+        <button class="btn btn-save" onclick="App.submitRequest()">📩 Gửi đề xuất</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REQUEST MANAGER MODAL (admin reviews) ───────────────────────── -->
+  <div class="modal-overlay hidden" id="modal-req-manager">
+    <div class="modal-box" style="max-width:640px">
+      <div class="modal-header">
+        <h3>📩 Quản lý Yêu cầu Đổi Link</h3>
+        <button class="btn-close"
+          onclick="document.getElementById('modal-req-manager').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="req-manager-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group Manager Modal -->
+  <div class="modal-overlay hidden" id="modal-groups">
+    <div class="modal-box" style="max-width:440px">
+      <div class="modal-header">
+        <h3>👥 Quản lý Nhóm</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-groups').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="group-manager-list"></div>
+        <div class="add-group-row">
+          <input class="form-control" type="text" id="new-group-input" placeholder="Tên nhóm mới...">
+          <button class="btn btn-save" onclick="AdminPanel.addGroup()">+ Thêm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div class="modal-overlay hidden" id="modal-passgroup">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-header">
+        <h3>🔑 Đổi mật khẩu Admin</h3>
+        <button class="btn-close"
+          onclick="document.getElementById('modal-passgroup').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="new-pass-input">Mật khẩu mới</label>
+          <input class="form-control" type="password" id="new-pass-input" placeholder="Nhập mật khẩu mới...">
+        </div>
+        <div class="form-group">
+          <label for="confirm-pass-input">Xác nhận mật khẩu</label>
+          <input class="form-control" type="password" id="confirm-pass-input" placeholder="Nhập lại mật khẩu...">
+        </div>
+        <div class="error-msg pass-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel"
+          onclick="document.getElementById('modal-passgroup').classList.add('hidden')">Hủy</button>
+        <button class="btn btn-save" onclick="AdminPanel.submitNewPassword()">💾 Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div class="modal-overlay hidden" id="modal-confirm">
+    <div class="modal-box" style="max-width:380px">
+      <div class="modal-header">
+        <h3>⚠️ Xác nhận xóa</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-confirm').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-body">
+          <div class="confirm-icon">🗑️</div>
+          <p>Bạn có chắc muốn xóa <strong class="confirm-item-name"></strong>?</p>
+          <p style="margin-top:6px;color:#999;font-size:0.82rem">Hành động này không thể hoàn tác.</p>
+          <div class="confirm-extra" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel"
+          onclick="document.getElementById('modal-confirm').classList.add('hidden')">Hủy</button>
+        <button class="btn btn-danger" onclick="AdminPanel.executeDelete()">🗑️ Xóa</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="modal-settings">
+    <div class="modal-box" style="max-width:500px">
+      <div class="modal-header">
+        <h3>🎨 Cá nhân hóa nền Portal (Admin)</h3>
+        <button class="btn-close" onclick="AdminPanel.closeSettings()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 24px;">
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>Màu nền cơ bản (Background Color)</label>
+          <input type="color" id="bg-color-input" class="form-control"
+            style="padding:0 4px; height:40px; cursor:pointer;" oninput="AdminPanel.previewSettings()">
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>Ảnh nền (URL Web hoặc Tên file trong thư mục)</label>
+          <input type="text" id="bg-url-input" class="form-control"
+            placeholder="VD: Picture/background.jpg hoặc https://..." oninput="AdminPanel.previewSettings()">
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label>Hoặc Upload Ảnh từ máy tĩnh (tự động nén)</label>
+          <input type="file" id="bg-file-input" class="form-control" accept="image/*"
+            onchange="AdminPanel.handleBgUpload(event)">
+        </div>
+        <div class="form-row" style="margin-bottom:18px;">
+          <div class="form-group">
+            <label>Độ sắc nét ảnh (Opacity: <span id="bg-op-val">100%</span>)</label>
+            <input type="range" id="bg-opacity-input" min="0" max="100" class="form-control"
+              oninput="AdminPanel.previewSettings()">
+          </div>
+          <div class="form-group">
+            <label>Kiểu hiển thị (Crop/Fit)</label>
+            <select id="bg-size-input" class="form-control" onchange="AdminPanel.previewSettings()">
+              <option value="cover">Cắt vừa khít (Cover)</option>
+              <option value="contain">Trọn ảnh trống viền (Contain)</option>
+              <option value="auto">Bản gốc trải ngói (Auto)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="font-weight:600;">
+            <input type="checkbox" id="bg-blobs-input" onchange="AdminPanel.previewSettings()">
+            Bật khói sáng 4 màu (Ambient Liquid Blobs)
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel" onclick="AdminPanel.closeSettings()">Hủy</button>
+        <button class="btn btn-save" onclick="AdminPanel.saveSettings()">💾 Lưu Giao diện</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ SCRIPTS ═══════════════════════════════════ -->
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+
+</html>
