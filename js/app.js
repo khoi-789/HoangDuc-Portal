@@ -489,9 +489,15 @@ const App = (() => {
 
     function _performLogin(group) {
         Auth.setGroup(group);
-        document.getElementById('group-selector-screen').style.display = 'none';
-        document.getElementById('app-main').style.display = 'block';
+        showApp();
         updateUserBadge();
+        
+        if (Auth.isAdmin()) {
+            document.getElementById('admin-toolbar').classList.remove('hidden');
+            setAdminHeaderMode(true);
+            AdminPanel.updateRequestBadge();
+        }
+        
         render();
         addRippleToButtons();
     }
