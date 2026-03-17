@@ -307,7 +307,16 @@ a {
 
 #btn-gear:hover {
   background: rgba(255, 255, 255, 0.3);
-  transform: rotate(60deg) scale(1.1);
+  transform: scale(1.1);
+}
+
+#btn-gear:hover .gear-icon {
+  transform: rotate(60deg);
+}
+
+.gear-icon {
+  display: flex;
+  transition: transform 0.3s ease;
 }
 
 /* Search Bar */

@@ -453,7 +453,7 @@ const App = (() => {
         updateUserBadge();
         if (Auth.isAdmin()) {
             document.getElementById('admin-toolbar').classList.remove('hidden');
-            document.getElementById('app-header').classList.add('admin-header');
+            setAdminHeaderMode(true);
             AdminPanel.updateRequestBadge();
         }
         render();
@@ -549,8 +549,14 @@ const App = (() => {
 
     function setAdminHeaderMode(on) {
         const header = document.getElementById('app-header');
-        if (on) header.classList.add('admin-header');
-        else header.classList.remove('admin-header');
+        const btnGear = document.getElementById('btn-gear');
+        if (on) {
+            header.classList.add('admin-header');
+            if (btnGear) btnGear.style.display = 'none';
+        } else {
+            header.classList.remove('admin-header');
+            if (btnGear) btnGear.style.display = 'grid';
+        }
         updateUserBadge();
     }
 
