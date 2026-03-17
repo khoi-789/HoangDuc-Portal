@@ -108,7 +108,42 @@ const AdminPanel = (() => {
         return stored ? JSON.parse(stored) : [...DEFAULT_GROUPS];
     }
 
-    function saveGroups(groups) { localStorage.setItem('gxp_groups', JSON.stringify(groups)); }
+    function saveGroups(groups) { 
+        localStorage.setItem('gxp_groups', JSON.stringify(groups));
+        FirebaseService.set(FirebaseService.PATHS.GROUPS, groups);
+    }
+
+    // Sync groups from Firebase on load
+    async function initFirestore() {
+        const data = await FirebaseService.loadAllData();
+        const settings = data.settings || {};
+        
+        // Groups sync
+        if (settings.groups) {
+            localStorage.setItem('gxp_groups', JSON.stringify(settings.groups));
+        }
+
+        // Theme sync
+        if (settings.theme) {
+            localStorage.setItem('gxp_theme_settings', JSON.stringify(settings.theme));
+            if (typeof App !== 'undefined' && App.applyThemeSettings) App.applyThemeSettings();
+        }
+
+        // Listen for remote changes
+        FirebaseService.onChange(FirebaseService.PATHS.GROUPS, (val) => {
+            if (val) {
+                localStorage.setItem('gxp_groups', JSON.stringify(val));
+                if (typeof App !== 'undefined' && App.render) App.render();
+            }
+        });
+
+        FirebaseService.onChange(FirebaseService.PATHS.THEME, (val) => {
+            if (val) {
+                localStorage.setItem('gxp_theme_settings', JSON.stringify(val));
+                if (typeof App !== 'undefined' && App.applyThemeSettings) App.applyThemeSettings();
+            }
+        });
+    }
 
     function addGroup() {
         const input = document.getElementById('new-group-input');
@@ -449,6 +484,8 @@ const AdminPanel = (() => {
     // ══════════════════════════════════════════
     // THEME SETTINGS (Admin Mode)
     // ══════════════════════════════════════════
+    let _pendingBgFile = null;
+
     function openSettings() {
         const modal = document.getElementById('modal-settings');
         const s = App.getThemeSettings();
@@ -459,6 +496,7 @@ const AdminPanel = (() => {
         document.getElementById('bg-size-input').value = s.size;
         document.getElementById('bg-blobs-input').checked = s.blobs;
         document.getElementById('bg-file-input').value = null;
+        _pendingBgFile = null;
         modal.classList.remove('hidden');
     }
 
@@ -487,8 +525,8 @@ const AdminPanel = (() => {
             const imgUrl = evt.target.result;
             document.getElementById('bg-url-input').value = imgUrl; // Load into input
             previewSettings();
-            if (imgUrl.length > 2 * 1024 * 1024) {
-                showToast('⚠️ Ảnh hơi lớn, nên dùng link thay thế nếu web load bị chậm.', 'error');
+            if (imgUrl.length > 1 * 1024 * 1024) {
+                showToast('⚠️ Ảnh hơi lớn, nên dùng link Google Drive để app load nhanh hơn.', 'error');
             }
         };
         reader.readAsDataURL(file);
@@ -503,12 +541,14 @@ const AdminPanel = (() => {
             blobs: document.getElementById('bg-blobs-input').checked
         };
         localStorage.setItem('gxp_theme_settings', JSON.stringify(settings));
+        FirebaseService.set(FirebaseService.PATHS.THEME, settings); // Sync to Firebase
         App.applyThemeSettings();
         document.getElementById('modal-settings').classList.add('hidden');
         showToast('✅ Đã lưu cấu hình giao diện!');
     }
 
     return {
+        initFirestore,
         updateRequestBadge,
         openRequestManager, renderRequestList, approveReq, rejectReq,
         openGroupManager, addGroup, deleteGroup, promptResetGroupPass,

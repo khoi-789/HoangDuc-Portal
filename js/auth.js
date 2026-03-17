@@ -11,6 +11,30 @@ const Auth = (() => {
     // ── Public API ──────────────────────────────────────────────────────
     let _currentGroup = null;
 
+    async function initFirestore() {
+        const data = await FirebaseService.loadAllData();
+        const settings = data.settings || {};
+        
+        if (settings.admin_password) {
+            localStorage.setItem(STORAGE_KEYS.ADMIN_PASS, settings.admin_password);
+        }
+        if (settings.group_passwords) {
+            localStorage.setItem(STORAGE_KEYS.GROUP_PASSWORDS, JSON.stringify(settings.group_passwords));
+        }
+
+        FirebaseService.onChange(FirebaseService.PATHS.ADMIN_PASS, (val) => {
+            if (val) localStorage.setItem(STORAGE_KEYS.ADMIN_PASS, val);
+        });
+
+        FirebaseService.onChange(FirebaseService.PATHS.GROUP_PASSWORDS, (val) => {
+            if (val) {
+                localStorage.setItem(STORAGE_KEYS.GROUP_PASSWORDS, JSON.stringify(val));
+            } else {
+                localStorage.removeItem(STORAGE_KEYS.GROUP_PASSWORDS);
+            }
+        });
+    }
+
     function getGroup() {
         return _currentGroup;
     }
@@ -41,6 +65,7 @@ const Auth = (() => {
 
     function setAdminPassword(newPass) {
         localStorage.setItem(STORAGE_KEYS.ADMIN_PASS, newPass);
+        FirebaseService.set(FirebaseService.PATHS.ADMIN_PASS, newPass);
     }
 
     function verifyAdminPassword(input) {
@@ -60,6 +85,7 @@ const Auth = (() => {
             delete map[group]; // remove password
         }
         localStorage.setItem(STORAGE_KEYS.GROUP_PASSWORDS, JSON.stringify(map));
+        FirebaseService.set(FirebaseService.PATHS.GROUP_PASSWORDS, map);
     }
 
     function verifyGroupPassword(group, input) {
@@ -78,6 +104,7 @@ const Auth = (() => {
     }
 
     return {
+        initFirestore,
         getGroup,
         setGroup,
         clearGroup,

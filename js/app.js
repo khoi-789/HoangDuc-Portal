@@ -4,6 +4,26 @@ const App = (() => {
     let currentFolder = null;
     let draggedItemId = null;
 
+    // ── Helper: Convert Google Drive links to Direct Link ────────────
+    function getDirectDriveLink(url) {
+        if (!url || typeof url !== 'string') return url;
+        // Case: full Drive URL (view or edit)
+        if (url.includes('drive.google.com/file/d/')) {
+            const match = url.match(/\/file\/d\/([^/]+)/);
+            if (match && match[1]) return `https://lh3.googleusercontent.com/u/0/d/${match[1]}`;
+        }
+        // Case: share short link
+        if (url.includes('drive.google.com/open?id=')) {
+            const match = url.match(/id=([^&]+)/);
+            if (match && match[1]) return `https://lh3.googleusercontent.com/u/0/d/${match[1]}`;
+        }
+        // Case: raw ID (numeric/alphanumeric)
+        if (/^[a-zA-Z0-9_-]{25,}$/.test(url)) {
+            return `https://lh3.googleusercontent.com/u/0/d/${url}`;
+        }
+        return url;
+    }
+
     // ══════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════
@@ -69,7 +89,7 @@ const App = (() => {
             thumbHTML = `<div class="card-thumb note-thumb"><span class="note-icon-svg">📄</span></div>`;
         } else if (item.thumbnail) {
             const imgSrc = item.thumbnail.startsWith('http')
-                ? item.thumbnail
+                ? getDirectDriveLink(item.thumbnail)
                 : `https://drive.google.com/thumbnail?id=${item.thumbnail}&sz=w400`;
             thumbHTML = `<div class="card-thumb"><img src="${imgSrc}" alt="${item.title}" loading="lazy" onerror="this.parentElement.innerHTML='<span style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:3rem;\\'>🔗</span>'"></div>`;
         } else {
@@ -405,7 +425,17 @@ const App = (() => {
     // ══════════════════════════════════════════
     // INIT & SETUP
     // ══════════════════════════════════════════
-    function init() {
+    async function init() {
+        // Show a temporary loading state if needed
+        console.log("App: Initializing with Firebase...");
+        
+        // Wait for all services to sync with Firebase
+        await Promise.all([
+            Store.initFirestore(),
+            Auth.initFirestore(),
+            AdminPanel.initFirestore()
+        ]);
+        
         applyThemeSettings();
         const group = Auth.getGroup();
         if (!group) { showGroupSelector(); return; }
@@ -531,7 +561,8 @@ const App = (() => {
         if (layer) {
             if (bgImage) {
                 // If it's a URL or base64 or relative path
-                layer.style.backgroundImage = `url("${bgImage}")`;
+                const processedUrl = getDirectDriveLink(bgImage);
+                layer.style.backgroundImage = `url("${processedUrl}")`;
                 layer.style.opacity = (opacity / 100).toString();
                 layer.style.backgroundSize = size === 'auto' ? 'auto' : size;
             } else {

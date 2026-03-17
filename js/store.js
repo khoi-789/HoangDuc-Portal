@@ -1,4 +1,4 @@
-// GxP Portal - Data Store (CRUD + localStorage)
+// GxP Portal - Data Store (CRUD + Firebase Sync)
 
 const Store = (() => {
     const KEYS = {
@@ -7,20 +7,61 @@ const Store = (() => {
         REQUESTS: 'gxp_link_requests'
     };
 
+    let _items = [];
+    let _history = [];
+    let _requests = [];
+
+    // ── Sync with Firebase ──────────────────────────────────────────────
+    async function initFirestore() {
+        const data = await FirebaseService.loadAllData();
+        
+        // Items
+        if (data.items) {
+            _items = Object.values(data.items);
+            localStorage.setItem(KEYS.ITEMS, JSON.stringify(_items));
+        } else {
+            _items = JSON.parse(localStorage.getItem(KEYS.ITEMS)) || JSON.parse(JSON.stringify(DEFAULT_ITEMS));
+            FirebaseService.set(FirebaseService.PATHS.ITEMS, _items);
+        }
+
+        // History
+        if (data.history) {
+            _history = Object.values(data.history);
+        }
+
+        // Requests
+        if (data.requests) {
+            _requests = Object.values(data.requests);
+        }
+
+        // Listen for remote updates
+        FirebaseService.onChange(FirebaseService.PATHS.ITEMS, (val) => {
+            if (val) {
+                _items = Object.values(val);
+                localStorage.setItem(KEYS.ITEMS, JSON.stringify(_items));
+                if (typeof App !== 'undefined' && App.render) App.render();
+            }
+        });
+
+        FirebaseService.onChange(FirebaseService.PATHS.REQUESTS, (val) => {
+            if (val) {
+                _requests = Object.values(val);
+                if (typeof AdminPanel !== 'undefined' && AdminPanel.updateRequestBadge) AdminPanel.updateRequestBadge();
+            }
+        });
+    }
+
     // ══════════════════════════════════════════
     // ITEMS
     // ══════════════════════════════════════════
     function getItems() {
-        try {
-            const raw = localStorage.getItem(KEYS.ITEMS);
-            return raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_ITEMS));
-        } catch (e) {
-            return JSON.parse(JSON.stringify(DEFAULT_ITEMS));
-        }
+        return _items;
     }
 
     function saveItems(items) {
+        _items = items;
         localStorage.setItem(KEYS.ITEMS, JSON.stringify(items));
+        FirebaseService.set(FirebaseService.PATHS.ITEMS, items);
     }
 
     function getById(id) {
@@ -30,13 +71,13 @@ const Store = (() => {
     function getChildren(parentId) {
         return getItems()
             .filter(i => i.parentId === parentId)
-            .sort((a, b) => a.order - b.order);
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
     }
 
     function getRootItems() {
         return getItems()
             .filter(i => !i.parentId)
-            .sort((a, b) => a.order - b.order);
+            .sort((a, b) => (a.order || 0) - (b.order || 0));
     }
 
     function getFolders(excludeId = null) {
@@ -44,7 +85,7 @@ const Store = (() => {
     }
 
     function addItem(item) {
-        const items = getItems();
+        const items = [...getItems()];
         item.id = 'item-' + Date.now();
         item.urlHistory = [];
         item.changeLog = [];
@@ -64,7 +105,7 @@ const Store = (() => {
     }
 
     function updateItem(id, data, changedBy = 'admin') {
-        const items = getItems();
+        const items = [...getItems()];
         const idx = items.findIndex(i => i.id === id);
         if (idx === -1) return null;
 
@@ -84,7 +125,7 @@ const Store = (() => {
         if (data.url && data.url !== old.url) {
             changeDetails.push(`URL: ${old.url} → ${data.url}`);
             // Push to urlHistory
-            const hist = old.urlHistory || [];
+            const hist = [...(old.urlHistory || [])];
             hist.unshift({
                 url: data.url,
                 activatedAt: new Date().toLocaleString('vi-VN'),
@@ -95,7 +136,7 @@ const Store = (() => {
         }
 
         // Merge change log
-        const existingLog = old.changeLog || [];
+        const existingLog = [...(old.changeLog || [])];
         if (changeDetails.length > 0) {
             existingLog.unshift(_makeLog('Cập nhật', changeDetails.join('; '), changedBy));
         }
@@ -108,9 +149,8 @@ const Store = (() => {
     }
 
     function deleteItem(id) {
-        let items = getItems();
-        const item = items.find(i => i.id === id);
-        items = items.filter(i => i.id !== id && i.parentId !== id);
+        let items = getItems().filter(i => i.id !== id && i.parentId !== id);
+        const item = getById(id);
         saveItems(items);
         if (item) addHistory('Xóa', item.title, id);
     }
@@ -124,18 +164,18 @@ const Store = (() => {
 
     // ── URL Version specific ─────────────────────────────────────────────
     function activateUrlVersion(itemId, url, note = '') {
-        const items = getItems();
+        const items = [...getItems()];
         const idx = items.findIndex(i => i.id === itemId);
         if (idx === -1) return;
         const old = items[idx];
-        const hist = old.urlHistory || [];
+        const hist = [...(old.urlHistory || [])];
         hist.unshift({
             url,
             activatedAt: new Date().toLocaleString('vi-VN'),
             activatedBy: 'admin (reactivate)',
             note: note || 'Kích hoạt lại phiên bản cũ'
         });
-        const log = old.changeLog || [];
+        const log = [...(old.changeLog || [])];
         log.unshift(_makeLog('Kích hoạt URL cũ', `URL: ${url}`, 'admin'));
         items[idx] = { ...old, url, urlHistory: hist, changeLog: log };
         saveItems(items);
@@ -153,7 +193,7 @@ const Store = (() => {
     }
 
     function deleteUrlVersion(itemId, versionIndex) {
-        const items = getItems();
+        const items = [...getItems()];
         const idx = items.findIndex(i => i.id === itemId);
         if (idx === -1) return;
         const old = items[idx];
@@ -161,7 +201,7 @@ const Store = (() => {
         // Cannot delete the current active version (index 0)
         if (versionIndex <= 0 || versionIndex >= hist.length) return;
         const removed = hist.splice(versionIndex, 1)[0];
-        const log = old.changeLog || [];
+        const log = [...(old.changeLog || [])];
         log.unshift(_makeLog('Xóa phiên bản URL', `URL: ${removed.url}`, 'admin'));
         items[idx] = { ...old, urlHistory: hist, changeLog: log };
         saveItems(items);
@@ -171,22 +211,21 @@ const Store = (() => {
     // GLOBAL HISTORY LOG
     // ══════════════════════════════════════════
     function getHistory() {
-        try {
-            const raw = localStorage.getItem(KEYS.HISTORY);
-            return raw ? JSON.parse(raw) : [];
-        } catch (e) { return []; }
+        return _history;
     }
 
     function addHistory(action, itemTitle, itemId) {
-        const hist = getHistory();
-        hist.unshift({
+        const hist = [...getHistory()];
+        const entry = {
             action,
             itemTitle,
             itemId,
             time: new Date().toLocaleString('vi-VN'),
-            group: Auth ? Auth.getGroup() : ''
-        });
-        localStorage.setItem(KEYS.HISTORY, JSON.stringify(hist.slice(0, 100)));
+            group: (typeof Auth !== 'undefined' && Auth.getGroup) ? Auth.getGroup() : ''
+        };
+        hist.unshift(entry);
+        _history = hist.slice(0, 100);
+        FirebaseService.set(FirebaseService.PATHS.HISTORY, _history);
     }
 
     function _makeLog(action, detail, by) {
@@ -202,26 +241,24 @@ const Store = (() => {
     // LINK CHANGE REQUESTS
     // ══════════════════════════════════════════
     function getRequests() {
-        try {
-            const raw = localStorage.getItem(KEYS.REQUESTS);
-            return raw ? JSON.parse(raw) : [];
-        } catch (e) { return []; }
+        return _requests;
     }
 
     function saveRequests(reqs) {
-        localStorage.setItem(KEYS.REQUESTS, JSON.stringify(reqs));
+        _requests = reqs;
+        FirebaseService.set(FirebaseService.PATHS.REQUESTS, reqs);
     }
 
     function addRequest(itemId, newUrl, note) {
         const item = getById(itemId);
         if (!item) return null;
-        const reqs = getRequests();
+        const reqs = [...getRequests()];
         const req = {
             id: 'req-' + Date.now(),
             itemId,
             itemTitle: item.title,
             currentUrl: item.url,
-            requestedBy: Auth ? Auth.getGroup() : 'Unknown',
+            requestedBy: (typeof Auth !== 'undefined' && Auth.getGroup) ? Auth.getGroup() : 'Unknown',
             newUrl,
             note,
             status: 'pending',
@@ -235,7 +272,7 @@ const Store = (() => {
     }
 
     function approveRequest(reqId, reviewNote = '') {
-        const reqs = getRequests();
+        const reqs = [...getRequests()];
         const idx = reqs.findIndex(r => r.id === reqId);
         if (idx === -1) return;
         const req = reqs[idx];
@@ -249,10 +286,10 @@ const Store = (() => {
         // Apply URL change
         updateItem(req.itemId, { url: req.newUrl }, `request by ${req.requestedBy}`);
         // Annotate history entry
-        const items = getItems();
+        const items = [...getItems()];
         const iIdx = items.findIndex(i => i.id === req.itemId);
         if (iIdx !== -1) {
-            const log = items[iIdx].changeLog || [];
+            const log = [...(items[iIdx].changeLog || [])];
             log.unshift(_makeLog('Duyệt yêu cầu link', `${req.requestedBy}: ${req.newUrl}`, 'admin'));
             items[iIdx].changeLog = log;
             saveItems(items);
@@ -260,7 +297,7 @@ const Store = (() => {
     }
 
     function rejectRequest(reqId, reviewNote = '') {
-        const reqs = getRequests();
+        const reqs = [...getRequests()];
         const idx = reqs.findIndex(r => r.id === reqId);
         if (idx !== -1) {
             reqs[idx] = {
@@ -282,7 +319,7 @@ const Store = (() => {
     }
 
     function reorderItem(movedId, targetId, isBefore) {
-        let items = getItems();
+        let items = [...getItems()];
         const movedItem = items.find(i => i.id === movedId);
         const targetItem = items.find(i => i.id === targetId);
         if (!movedItem || !targetItem) return;
@@ -309,6 +346,7 @@ const Store = (() => {
     }
 
     return {
+        initFirestore,
         // Items
         getItems, saveItems, getById, getChildren, getRootItems, getFolders,
         addItem, updateItem, deleteItem, reorderItem, resetToDefault,
