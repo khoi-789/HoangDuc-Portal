@@ -50,12 +50,15 @@ const FirebaseService = (() => {
 
     // Lưu/Cập nhật dữ liệu
     async function set(path, data) {
-        return db.ref(path).set(data);
+        // Firebase không chấp nhận 'undefined'. Chuyển sang JSON rồi ngược lại để loại bỏ các trường undefined.
+        const cleanData = JSON.parse(JSON.stringify(data));
+        return db.ref(path).set(cleanData);
     }
 
     // Đẩy dữ liệu vào danh sách (tạo ID tự động)
     async function push(path, data) {
-        return db.ref(path).push(data);
+        const cleanData = JSON.parse(JSON.stringify(data));
+        return db.ref(path).push(cleanData);
     }
 
     return {
