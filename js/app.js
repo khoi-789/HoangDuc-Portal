@@ -373,6 +373,16 @@ const App = (() => {
         currentFolder = null;
         document.getElementById('modal-folder').classList.add('hidden');
         hideRootDropBanner();
+        render(); // Refresh grid to show root items
+    }
+
+    function goHome() {
+        currentFolder = null;
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        render();
+        // Also close folder modal if open
+        document.getElementById('modal-folder').classList.add('hidden');
     }
 
     // ══════════════════════════════════════════
@@ -674,7 +684,7 @@ const App = (() => {
     }
 
     return {
-        init, render, selectGroup, changeGroup,
+        init, render, goHome, selectGroup, changeGroup,
         openNote, closeNote, openFolder, closeFolder,
         openRequestModal, submitRequest,
         onGearClick, openLoginModal, submitAdminLogin, adminLogout, submitGroupLogin,
